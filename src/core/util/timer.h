@@ -148,6 +148,7 @@ class fast_clock {
 #ifdef __x86_64__
   static __forceinline raw_rep raw_now() { return __rdtsc(); }
   static __forceinline raw_frequency raw_freq() { return freq; }
+  static __forceinline int type() { return 0; }
 #else
   static __forceinline raw_rep raw_now() {
     struct timespec ts;
@@ -155,6 +156,7 @@ class fast_clock {
     return (raw_rep(ts.tv_sec) * 1000000000 + raw_rep(ts.tv_nsec));
   }
   static __forceinline raw_frequency raw_freq() { return 1.e-9; }
+  static __forceinline int type() { return 1; }
 #endif
 
  private:

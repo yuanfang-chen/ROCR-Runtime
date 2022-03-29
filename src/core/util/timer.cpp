@@ -40,6 +40,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+#include <unistd.h>
+
 #include "core/util/timer.h"
 
 namespace rocr {
@@ -48,6 +50,23 @@ namespace timer {
 accurate_clock::init::init() {
   freq = os::AccurateClockFrequency();
   accurate_clock::period_ns = 1e9 / double(freq);
+}
+
+struct sample {
+  fast_clock::raw_rep r1, r2;
+  accurate_clock::time_point t0, t1, t2, t3;
+};
+static sample samples[100] = {0};
+int iteration = 0;
+
+void PrintClockSamples() {
+  printf("Iteration %d\n", iteration);
+  for (auto sample : samples) {
+    printf("type=%d r1=%ld r2=%ld dt1=%ld dt2=%ld dt3=%ld.\n", fast_clock::type(), sample.r1, sample.r2,
+           std::chrono::duration_cast<std::chrono::nanoseconds>(sample.t1 - sample.t0).count(),
+           std::chrono::duration_cast<std::chrono::nanoseconds>(sample.t2 - sample.t0).count(),
+           std::chrono::duration_cast<std::chrono::nanoseconds>(sample.t3 - sample.t0).count());
+  }
 }
 
 // Calibrates the fast clock using the accurate clock.
@@ -88,8 +107,22 @@ fast_clock::init::init() {
         elapsed = t3 - t1;
         min = r2 - r1;
       }
+
+      samples[iteration].r1 = r1;
+      samples[iteration].r2 = r2;
+      samples[iteration].t0 = t0;
+      samples[iteration].t1 = t1;
+      samples[iteration].t2 = t2;
+      samples[iteration].t3 = t3;
+      iteration++;
     }
     delay += delay;
+
+    if (iteration == 100) {
+      uint64_t pid = getpid();
+      printf("PID %ld: Warning, fast clock may be corrupt.\n", pid);
+      iteration = 0;
+    }
   } while (min < 1000);
 
   fast_clock::freq = double(min) / duration_in_seconds(elapsed);
