@@ -146,6 +146,7 @@ fast_clock::init::init() {
 
     if (iteration == 100) {
       PrintClockSamples();
+      abort();
       iteration = 0;
     }
   } while (min < 1000);
