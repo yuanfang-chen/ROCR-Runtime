@@ -144,6 +144,8 @@ fast_clock::init::init() {
 
     if (iteration == 100) {
       PrintClockSamples();
+      fprintf("Hang detected\n");
+      fclose(file);
       abort();
       iteration = 0;
     }
