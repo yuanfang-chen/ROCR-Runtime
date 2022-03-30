@@ -41,6 +41,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include <unistd.h>
+#include "stdio.h"
 
 #include "core/util/timer.h"
 
@@ -55,17 +56,26 @@ accurate_clock::init::init() {
 struct sample {
   fast_clock::raw_rep r1, r2;
   accurate_clock::time_point t0, t1, t2, t3;
+  fast_clock::raw_rep min;
+  accurate_clock::duration elapsed;
+  bool shortest, first, second;
 };
 static sample samples[100] = {0};
-int iteration = 0;
+static int iteration = 0;
+static FILE* file = nullptr;
 
 void PrintClockSamples() {
-  printf("Iteration %d\n", iteration);
   for (auto sample : samples) {
-    printf("type=%d r1=%ld r2=%ld dt1=%ld dt2=%ld dt3=%ld.\n", fast_clock::type(), sample.r1, sample.r2,
-           std::chrono::duration_cast<std::chrono::nanoseconds>(sample.t1 - sample.t0).count(),
-           std::chrono::duration_cast<std::chrono::nanoseconds>(sample.t2 - sample.t0).count(),
-           std::chrono::duration_cast<std::chrono::nanoseconds>(sample.t3 - sample.t0).count());
+    fprintf(file,
+            "type=%d r1=%ld r2=%ld dt1=%ld dt2=%ld dt3=%ld dr=%ld elapsed=%ld min=%ld short=%d "
+            "first=%d second=%d\n",
+            fast_clock::type(), sample.r1, sample.r2,
+            std::chrono::duration_cast<std::chrono::nanoseconds>(sample.t1 - sample.t0).count(),
+            std::chrono::duration_cast<std::chrono::nanoseconds>(sample.t2 - sample.t0).count(),
+            std::chrono::duration_cast<std::chrono::nanoseconds>(sample.t3 - sample.t0).count(),
+            sample.r2 - sample.r1,
+            std::chrono::duration_cast<std::chrono::nanoseconds>(sample.elapsed).count(),
+            sample.min, sample.shortest, sample.first, sample.second);
   }
 }
 
@@ -73,6 +83,15 @@ void PrintClockSamples() {
 fast_clock::init::init() {
   typedef accurate_clock clock;
   clock::duration delay(std::chrono::milliseconds(1));
+
+  uint64_t pid = getpid();
+  char buff[17];
+  snprintf(buff, 17, "%ld", pid);
+  buff[16] = '\0';
+  std::string name = std::string("rocr_log_") + buff + ".txt";
+  if (file != nullptr) fclose(file);
+  file = fopen(name.c_str(), "w");
+  assert(file != nullptr);
 
   // calibrate clock
   fast_clock::raw_rep min = 0;
@@ -116,16 +135,24 @@ fast_clock::init::init() {
       samples[iteration].t1 = t1;
       samples[iteration].t2 = t2;
       samples[iteration].t3 = t3;
+      samples[iteration].elapsed = elapsed;
+      samples[iteration].min = min;
+      samples[iteration].shortest = ((t3 - t1) == elapsed);
+      samples[iteration].first = ((t1 - t0) * 10 < (t2 - t1));
+      samples[iteration].second = ((t3 - t2) * 10 < (t2 - t1));
       iteration++;
     }
     delay += delay;
 
     if (iteration == 100) {
-      uint64_t pid = getpid();
-      printf("PID %ld: Warning, fast clock may be corrupt.\n", pid);
+      PrintClockSamples();
       iteration = 0;
     }
   } while (min < 1000);
+
+  PrintClockSamples();
+  fclose(file);
+  file = nullptr;
 
   fast_clock::freq = double(min) / duration_in_seconds(elapsed);
   fast_clock::period_ps = 1e12 / fast_clock::freq;
