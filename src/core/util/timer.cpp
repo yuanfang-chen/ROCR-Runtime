@@ -146,7 +146,8 @@ fast_clock::init::init() {
       PrintClockSamples();
       fprintf(file, "Hang detected\n");
       fclose(file);
-      abort();
+      while(true)
+        ; // Deliberate hang.
       iteration = 0;
     }
   } while (min < 1000);
