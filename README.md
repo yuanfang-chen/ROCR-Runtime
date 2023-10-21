@@ -1,4 +1,4 @@
-### HSA Runtime API and runtime for ROCm
+### HSA Runtime API and runtime for ROCm 
 
 This repository includes the user-mode API interfaces and libraries necessary for host applications to launch compute kernels to available HSA ROCm kernel agents. Reference source code for the core runtime is also available.
 
